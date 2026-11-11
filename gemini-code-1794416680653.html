@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>เกมจับคู่มาตรฐานสากล - Ultimate Edition</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #1a365d;
+            margin-bottom: 5px;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+        .header-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1000px;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            gap: 10px;
+        }
+        @media (min-width: 768px) {
+            .header-info {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 15px 25px;
+            }
+        }
+        .level-title { font-size: 1.1rem; font-weight: bold; color: #2b6cb0; }
+        .score-info { font-size: 1.1rem; font-weight: bold; display: flex; gap: 15px; }
+        .combo-text { color: #d69e2e; transition: transform 0.3s ease; }
+        .combo-active { color: #e53e3e; transform: scale(1.2); }
+        
+        .game-board {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            max-width: 1000px;
+            width: 100%;
+        }
+        @media (min-width: 768px) {
+            .game-board { flex-direction: row; gap: 40px; }
+        }
+        
+        .column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 200px;
+        }
+        
+        .draggable {
+            background-color: #3182ce;
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            cursor: grab;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background-color 0.2s;
+            user-select: none;
+            touch-action: none; /* สำคัญมาก: ป้องกันจอเลื่อนเวลาลากบนมือถือ */
+            z-index: 10;
+        }
+        .draggable.dragging {
+            background-color: #2b6cb0;
+            cursor: grabbing;
+            opacity: 0.9;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+        .draggable.matched {
+            background-color: #48bb78;
+            cursor: default;
+            pointer-events: none;
+            margin: 0;
+            width: 100%;
+            box-sizing: border-box;
+            box-shadow: none;
+        }
+
+        .drop-zone {
+            background-color: #e2e8f0;
+            border: 2px dashed #a0aec0;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        .drop-zone.drag-over {
+            background-color: #edf2f7;
+            border-color: #3182ce;
+            border-style: solid;
+        }
+        .drop-zone.matched {
+            background-color: #c6f6d5;
+            border-color: #48bb78;
+            border-style: solid;
+            padding: 10px;
+        }
+        .zone-text {
+            font-size: 0.9rem;
+            line-height: 1.4;
+            pointer-events: none;
+        }
+
+        .next-level-btn {
+            display: none;
+            margin-top: 30px;
+            background-color: #ed8936;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 300px;
+        }
+        .next-level-btn:hover { background-color: #dd6b20; }
+        
+        #game-over { display: none; flex-direction: column; align-items: center; margin-top: 50px; text-align: center; }
+        #game-over h2 { color: #2f855a; font-size: 1.8rem; }
+        #error-log { color: #e53e3e; font-weight: bold; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <h1>เกมจับคู่มาตรฐานสากล</h1>
+    <p style="color: #4a5568; margin-bottom: 20px; font-size: 0.9rem; text-align: center;">ใช้นิ้วแตะหรือเมาส์ลากชื่อองค์กร ไปวางในกล่องความรับผิดชอบให้ถูกต้อง</p>
+
+    <div class="header-info" id="header-info">
+        <div class="level-title" id="level-title">กำลังโหลด...</div>
+        <div class="score-info">
+            <div id="combo-display" class="combo-text">Combo: x1</div>
+            <div id="score-display">คะแนน: 0</div>
+        </div>
+    </div>
+
+    <div class="game-board" id="game-board">
+        <div class="column" id="draggables-container"></div>
+        <div class="column" id="dropzones-container"></div>
+    </div>
+
+    <button class="next-level-btn" id="next-level-btn">ไปด่านถัดไป ➔</button>
+
+    <div id="game-over">
+        <h2>🎉 ยินดีด้วย! คุณเคลียร์ครบทุกด่านแล้ว 🎉</h2>
+        <div class="score-info" style="font-size: 1.5rem;" id="final-score">คะแนนรวม: 0</div>
+        <button class="next-level-btn" style="display: block; margin-top: 20px;" onclick="location.reload()">เล่นใหม่อีกครั้ง</button>
+    </div>
+    
+    <div id="error-log"></div>
+
+    <script>
+        // ใช้ window.onload เพื่อรอให้ HTML แสดงผลเสร็จสมบูรณ์ก่อนรันสคริปต์
+        window.onload = function() {
+            try {
+                initGame();
+            } catch (err) {
+                document.getElementById('error-log').innerText = "ระบบพบปัญหา: " + err.message;
+                console.error(err);
+            }
+        };
+
+        function initGame() {
+            const levelsData = [
+                {
+                    title: "Level 1: มาตรฐานที่เจอบ่อย",
+                    items: [
+                        { id: "iso", name: "ISO", desc: "องค์กรมาตรฐานสากลที่พัฒนามาตรฐานระหว่างประเทศ ครอบคลุมการวิเคราะห์ทางเคมี การจัดการคุณภาพและความปลอดภัย" },
+                        { id: "tisi", name: "มอก. (สมอ.)", desc: "หน่วยงานมาตรฐานแห่งชาติของประเทศไทย พัฒนามาตรฐานผลิตภัณฑ์อุตสาหกรรม" },
+                        { id: "nimt", name: "มว. (NIMT)", desc: "สถาบันมาตรวิทยาแห่งชาติของไทย จัดหา รักษา และถ่ายทอดค่ามาตรฐานแห่งชาติ เช่น ดูแลตุ้มน้ำหนักมาตรฐาน" }
+                    ]
+                },
+                {
+                    title: "Level 2: มาตรฐานด้านการทดลองและวัสดุ",
+                    items: [
+                        { id: "glp", name: "GLP", desc: "ระบบคุณภาพการบริหารจัดการที่ควบคุมการศึกษาทดลองที่ไม่ใช่ทางคลินิก (Non-clinical) เช่น การทดสอบความเป็นพิษ" },
+                        { id: "astm", name: "ASTM", desc: "สมาคมที่พัฒนามาตรฐานสำหรับวัสดุต่างๆ เช่น โลหะ พลาสติก และเป็นค่ายหลักที่กำหนดมาตรฐานเกรดเครื่องแก้ว" },
+                        { id: "iupac", name: "IUPAC", desc: "องค์กรผู้กำหนดภาษากลาง เช่น ชื่อธาตุ ชื่อสารเคมีที่เป็นระบบ และการกำหนดค่าน้ำหนักอะตอมมาตรฐาน" }
+                    ]
+                },
+                {
+                    title: "Level 3: มาตรฐานเฉพาะทางอุตสาหกรรม",
+                    items: [
+                        { id: "aoac", name: "AOAC", desc: "พัฒนาวิธีการวิเคราะห์ที่ถูกต้องและเป็นกลางสำหรับอาหาร ยา และผลิตภัณฑ์ทางการเกษตร" },
+                        { id: "awwa", name: "AWWA", desc: "องค์กรที่พัฒนาและเผยแพร่มาตรฐานที่เกี่ยวข้องกับน้ำดื่มและโครงสร้างพื้นฐานระบบน้ำ" },
+                        { id: "uspnf", name: "USP-NF", desc: "องค์กรที่กำหนดมาตรฐานสำหรับความบริสุทธิ์ของยาและผลิตภัณฑ์สุขภาพอื่นๆ" },
+                        { id: "usepa", name: "US-EPA", desc: "หน่วยงานของรัฐบาลสหรัฐอเมริกาที่กำหนดมาตรฐานสำหรับการตรวจวัดสารปนเปื้อนในน้ำ อากาศ และดิน" }
+                    ]
+                }
+            ];
+
+            let currentLevelIndex = 0;
+            let score = 0;
+            let combo = 0;
+            let currentMultiplier = 1;
+            let matchesInCurrentLevel = 0;
+            const basePoints = 100;
+
+            const draggablesContainer = document.getElementById('draggables-container');
+            const dropzonesContainer = document.getElementById('dropzones-container');
+            const levelTitleElement = document.getElementById('level-title');
+            const scoreDisplay = document.getElementById('score-display');
+            const comboDisplay = document.getElementById('combo-display');
+            const nextLevelBtn = document.getElementById('next-level-btn');
+
+            function shuffleArray(array) {
+                let newArr = array.slice();
+                for (let i = newArr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    const temp = newArr[i];
+                    newArr[i] = newArr[j];
+                    newArr[j] = temp;
+                }
+                return newArr;
+            }
+
+            function loadLevel(index) {
+                draggablesContainer.innerHTML = '';
+                dropzonesContainer.innerHTML = '';
+                nextLevelBtn.style.display = 'none';
+                matchesInCurrentLevel = 0;
+
+                const level = levelsData[index];
+                levelTitleElement.innerText = level.title;
+
+                let draggables = shuffleArray(level.items);
+                let dropzones = shuffleArray(level.items);
+
+                draggables.forEach(function(item) {
+                    const div = document.createElement('div');
+                    div.className = 'draggable';
+                    div.setAttribute('data-match', item.id);
+                    div.innerText = item.name;
+                    draggablesContainer.appendChild(div);
+                });
+
+                dropzones.forEach(function(item) {
+                    const div = document.createElement('div');
+                    div.className = 'drop-zone';
+                    div.setAttribute('data-match', item.id);
+                    
+                    const text = document.createElement('div');
+                    text.className = 'zone-text';
+                    text.innerText = item.desc;
+                    
+                    div.appendChild(text);
+                    dropzonesContainer.appendChild(div);
+                });
+
+                attachPointerEvents();
+            }
+
+            function updateScore(isCorrect) {
+                if (isCorrect) {
+                    score += (basePoints * currentMultiplier);
+                    combo++;
+                    if (combo === 1) currentMultiplier = 2;
+                    else if (combo >= 2) currentMultiplier = 3;
+
+                    comboDisplay.innerText = "Combo: x" + currentMultiplier;
+                    comboDisplay.classList.add('combo-active');
+                    setTimeout(function() { comboDisplay.classList.remove('combo-active'); }, 300);
+                } else {
+                    combo = 0;
+                    currentMultiplier = 1;
+                    comboDisplay.innerText = "Combo: x1";
+                    comboDisplay.style.color = '#718096';
+                    setTimeout(function() { comboDisplay.style.color = '#d69e2e'; }, 500);
+                }
+                scoreDisplay.innerText = "คะแนน: " + score;
+            }
+
+            // --- ระบบ Pointer Events (ครอบคลุมทั้งเมาส์และนิ้วสัมผัส 100%) ---
+            let activeEl = null;
+            let startX = 0, startY = 0;
+            let origLeft = 0, origTop = 0;
+
+            function attachPointerEvents() {
+                const dragItems = document.querySelectorAll('.draggable');
+                dragItems.forEach(function(el) {
+                    el.addEventListener('pointerdown', handlePointerDown);
+                });
+            }
+
+            function handlePointerDown(e) {
+                if (e.target.classList.contains('matched')) return;
+                e.preventDefault();
+                
+                activeEl = e.target;
+                activeEl.setPointerCapture(e.pointerId);
+                
+                activeEl.addEventListener('pointermove', handlePointerMove);
+                activeEl.addEventListener('pointerup', handlePointerUp);
+                activeEl.addEventListener('pointercancel', handlePointerUp);
+                
+                const rect = activeEl.getBoundingClientRect();
+                
+                // แปลงเป็น fixed เพื่อให้ลากอิสระ
+                activeEl.style.position = 'fixed';
+                activeEl.style.width = rect.width + 'px';
+                activeEl.style.left = rect.left + 'px';
+                activeEl.style.top = rect.top + 'px';
+                activeEl.style.zIndex = '1000';
+                activeEl.classList.add('dragging');
+
+                startX = e.clientX;
+                startY = e.clientY;
+                origLeft = rect.left;
+                origTop = rect.top;
+            }
+
+            function handlePointerMove(e) {
+                if (!activeEl) return;
+                e.preventDefault();
+                
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                
+                activeEl.style.left = (origLeft + dx) + 'px';
+                activeEl.style.top = (origTop + dy) + 'px';
+
+                // ซ่อนชั่วคราวเพื่อตรวจจับกล่องเป้าหมายด้านล่าง
+                activeEl.style.visibility = 'hidden';
+                const elBelow = document.elementFromPoint(e.clientX, e.clientY);
+                activeEl.style.visibility = 'visible';
+
+                document.querySelectorAll('.drop-zone').forEach(function(z) { z.classList.remove('drag-over'); });
+                
+                if (elBelow) {
+                    const zone = elBelow.closest('.drop-zone');
+                    if (zone && !zone.classList.contains('matched')) {
+                        zone.classList.add('drag-over');
+                    }
+                }
+            }
+
+            function handlePointerUp(e) {
+                if (!activeEl) return;
+                
+                activeEl.releasePointerCapture(e.pointerId);
+                activeEl.removeEventListener('pointermove', handlePointerMove);
+                activeEl.removeEventListener('pointerup', handlePointerUp);
+                activeEl.removeEventListener('pointercancel', handlePointerUp);
+                
+                activeEl.classList.remove('dragging');
+                
+                activeEl.style.visibility = 'hidden';
+                const elBelow = document.elementFromPoint(e.clientX, e.clientY);
+                activeEl.style.visibility = 'visible';
+                
+                const targetZone = elBelow ? elBelow.closest('.drop-zone') : null;
+                document.querySelectorAll('.drop-zone').forEach(function(z) { z.classList.remove('drag-over'); });
+
+                if (targetZone && !targetZone.classList.contains('matched')) {
+                    checkDrop(activeEl, targetZone);
+                } else {
+                    resetElementStyle(activeEl);
+                }
+                activeEl = null;
+            }
+
+            function checkDrop(draggedEl, zone) {
+                const matchId = draggedEl.getAttribute('data-match');
+                const zoneId = zone.getAttribute('data-match');
+
+                if (matchId === zoneId) {
+                    resetElementStyle(draggedEl);
+                    zone.appendChild(draggedEl);
+                    zone.classList.add('matched');
+                    draggedEl.classList.add('matched');
+                    zone.querySelector('.zone-text').style.display = 'none';
+
+                    updateScore(true);
+                    matchesInCurrentLevel++;
+
+                    if (matchesInCurrentLevel === levelsData[currentLevelIndex].items.length) {
+                        if (currentLevelIndex < levelsData.length - 1) {
+                            nextLevelBtn.style.display = 'block';
+                            setTimeout(function() { nextLevelBtn.scrollIntoView({ behavior: 'smooth' }); }, 300);
+                        } else {
+                            setTimeout(function() {
+                                document.getElementById('game-board').style.display = 'none';
+                                document.getElementById('header-info').style.display = 'none';
+                                document.getElementById('game-over').style.display = 'flex';
+                                document.getElementById('final-score').innerText = "คะแนนรวม: " + score;
+                            }, 500);
+                        }
+                    }
+                } else {
+                    updateScore(false);
+                    zone.style.borderColor = '#e53e3e';
+                    resetElementStyle(draggedEl);
+                    setTimeout(function() {
+                        if (!zone.classList.contains('matched')) zone.style.borderColor = '#a0aec0';
+                    }, 500);
+                }
+            }
+
+            function resetElementStyle(el) {
+                el.style.position = '';
+                el.style.left = '';
+                el.style.top = '';
+                el.style.width = '';
+                el.style.zIndex = '';
+            }
+
+            nextLevelBtn.addEventListener('click', function() {
+                currentLevelIndex++;
+                loadLevel(currentLevelIndex);
+            });
+
+            // เริ่มด่านแรก
+            loadLevel(currentLevelIndex);
+        }
+    </script>
+</body>
+</html>
